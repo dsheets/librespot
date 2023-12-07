@@ -1,8 +1,8 @@
 use std::fmt;
 
-use librespot_protocol as protocol;
+use data_encoding::HEXLOWER;
 
-use crate::{spotify_id::to_base16, Error};
+use librespot_protocol as protocol;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileId(pub [u8; 20]);
@@ -14,21 +14,20 @@ impl FileId {
         FileId(dst)
     }
 
-    #[allow(clippy::wrong_self_convention)]
-    pub fn to_base16(&self) -> Result<String, Error> {
-        to_base16(&self.0, &mut [0u8; 40])
+    pub fn into_base16(&self) -> String {
+        HEXLOWER.encode(&self.0)
     }
 }
 
 impl fmt::Debug for FileId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("FileId").field(&self.to_base16()).finish()
+        f.debug_tuple("FileId").field(&self.into_base16()).finish()
     }
 }
 
 impl fmt::Display for FileId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_base16().unwrap_or_default())
+        f.write_str(&self.into_base16())
     }
 }
 

@@ -368,17 +368,12 @@ impl Cache {
     }
 
     pub fn file_path(&self, file: FileId) -> Option<PathBuf> {
-        match file.to_base16() {
-            Ok(name) => self.audio_location.as_ref().map(|location| {
-                let mut path = location.join(&name[0..2]);
-                path.push(&name[2..]);
-                path
-            }),
-            Err(e) => {
-                warn!("Invalid FileId: {}", e);
-                None
-            }
-        }
+        let name = file.into_base16();
+        self.audio_location.as_ref().map(|location| {
+            let mut path = location.join(&name[0..2]);
+            path.push(&name[2..]);
+            path
+        })
     }
 
     pub fn file(&self, file: FileId) -> Option<File> {

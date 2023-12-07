@@ -122,6 +122,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base62"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f879ef8fc74665ed7f0e6127cb106315888fc2744f68e14b74f83edbb2a08992"
+
+[[package]]
 name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1395,6 +1401,7 @@ name = "librespot-core"
 version = "0.5.0-dev"
 dependencies = [
  "aes",
+ "base62",
  "base64 0.21.5",
  "byteorder",
  "bytes",
@@ -1421,6 +1428,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "pbkdf2",
+ "percent-encoding",
  "priority-queue",
  "protobuf",
  "quick-xml",
@@ -1974,9 +1982,9 @@ dependencies = [
 
 [[package]]
 name = "percent-encoding"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b2a4787296e9989611394c33f193f676704af1686e70b8f8033ab5ba9a35a94"
+checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "petgraph"
