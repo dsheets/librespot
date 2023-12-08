@@ -26,143 +26,113 @@ impl EventHandler {
                             env_vars.insert("PLAY_REQUEST_ID", play_request_id.to_string());
                         }
                         PlayerEvent::TrackChanged { audio_item } => {
-                            match audio_item.track_id.to_base62() {
-                                Err(e) => {
-                                    warn!("PlayerEvent::TrackChanged: Invalid track id: {}", e)
-                                }
-                                Ok(id) => {
-                                    env_vars.insert("PLAYER_EVENT", "track_changed".to_string());
-                                    env_vars.insert("TRACK_ID", id);
-                                    env_vars.insert("URI", audio_item.uri);
-                                    env_vars.insert("NAME", audio_item.name);
+                            let id = audio_item.item.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "track_changed".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                            env_vars.insert("URI", audio_item.item.into());
+                            env_vars.insert("NAME", audio_item.name);
+                            env_vars.insert(
+                                "COVERS",
+                                audio_item
+                                    .covers
+                                    .into_iter()
+                                    .map(|c| c.url)
+                                    .collect::<Vec<String>>()
+                                    .join("\n"),
+                            );
+                            env_vars.insert("LANGUAGE", audio_item.language.join("\n"));
+                            env_vars.insert("DURATION_MS", audio_item.duration_ms.to_string());
+                            env_vars.insert("IS_EXPLICIT", audio_item.is_explicit.to_string());
+
+                            match audio_item.unique_fields {
+                                UniqueFields::Track {
+                                    artists,
+                                    album,
+                                    album_artists,
+                                    popularity,
+                                    number,
+                                    disc_number,
+                                } => {
+                                    env_vars.insert("ITEM_TYPE", "Track".to_string());
                                     env_vars.insert(
-                                        "COVERS",
-                                        audio_item
-                                            .covers
+                                        "ARTISTS",
+                                        artists
+                                            .0
                                             .into_iter()
-                                            .map(|c| c.url)
+                                            .map(|a| a.name)
                                             .collect::<Vec<String>>()
                                             .join("\n"),
                                     );
-                                    env_vars.insert("LANGUAGE", audio_item.language.join("\n"));
-                                    env_vars
-                                        .insert("DURATION_MS", audio_item.duration_ms.to_string());
-                                    env_vars
-                                        .insert("IS_EXPLICIT", audio_item.is_explicit.to_string());
-
-                                    match audio_item.unique_fields {
-                                        UniqueFields::Track {
-                                            artists,
-                                            album,
-                                            album_artists,
-                                            popularity,
-                                            number,
-                                            disc_number,
-                                        } => {
-                                            env_vars.insert("ITEM_TYPE", "Track".to_string());
-                                            env_vars.insert(
-                                                "ARTISTS",
-                                                artists
-                                                    .0
-                                                    .into_iter()
-                                                    .map(|a| a.name)
-                                                    .collect::<Vec<String>>()
-                                                    .join("\n"),
-                                            );
-                                            env_vars
-                                                .insert("ALBUM_ARTISTS", album_artists.join("\n"));
-                                            env_vars.insert("ALBUM", album);
-                                            env_vars.insert("POPULARITY", popularity.to_string());
-                                            env_vars.insert("NUMBER", number.to_string());
-                                            env_vars.insert("DISC_NUMBER", disc_number.to_string());
-                                        }
-                                        UniqueFields::Episode {
-                                            description,
-                                            publish_time,
-                                            show_name,
-                                        } => {
-                                            env_vars.insert("ITEM_TYPE", "Episode".to_string());
-                                            env_vars.insert("DESCRIPTION", description);
-                                            env_vars.insert(
-                                                "PUBLISH_TIME",
-                                                publish_time.unix_timestamp().to_string(),
-                                            );
-                                            env_vars.insert("SHOW_NAME", show_name);
-                                        }
-                                    }
+                                    env_vars.insert("ALBUM_ARTISTS", album_artists.join("\n"));
+                                    env_vars.insert("ALBUM", album);
+                                    env_vars.insert("POPULARITY", popularity.to_string());
+                                    env_vars.insert("NUMBER", number.to_string());
+                                    env_vars.insert("DISC_NUMBER", disc_number.to_string());
+                                }
+                                UniqueFields::Episode {
+                                    description,
+                                    publish_time,
+                                    show_name,
+                                } => {
+                                    env_vars.insert("ITEM_TYPE", "Episode".to_string());
+                                    env_vars.insert("DESCRIPTION", description);
+                                    env_vars.insert(
+                                        "PUBLISH_TIME",
+                                        publish_time.unix_timestamp().to_string(),
+                                    );
+                                    env_vars.insert("SHOW_NAME", show_name);
                                 }
                             }
                         }
-                        PlayerEvent::Stopped { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Stopped: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "stopped".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                            }
-                        },
+                        PlayerEvent::Stopped { track_id, .. } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "stopped".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                        }
                         PlayerEvent::Playing {
                             track_id,
                             position_ms,
                             ..
-                        } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Playing: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "playing".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                                env_vars.insert("POSITION_MS", position_ms.to_string());
-                            }
-                        },
+                        } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "playing".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                            env_vars.insert("POSITION_MS", position_ms.to_string());
+                        }
                         PlayerEvent::Paused {
                             track_id,
                             position_ms,
                             ..
-                        } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Paused: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "paused".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                                env_vars.insert("POSITION_MS", position_ms.to_string());
-                            }
-                        },
-                        PlayerEvent::Loading { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Loading: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "loading".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                            }
-                        },
-                        PlayerEvent::Preloading { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Preloading: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "preloading".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                            }
-                        },
-                        PlayerEvent::TimeToPreloadNextTrack { track_id, .. } => {
-                            match track_id.to_base62() {
-                                Err(e) => warn!(
-                                    "PlayerEvent::TimeToPreloadNextTrack: Invalid track id: {}",
-                                    e
-                                ),
-                                Ok(id) => {
-                                    env_vars.insert("PLAYER_EVENT", "preload_next".to_string());
-                                    env_vars.insert("TRACK_ID", id);
-                                }
-                            }
+                        } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "paused".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                            env_vars.insert("POSITION_MS", position_ms.to_string());
                         }
-                        PlayerEvent::EndOfTrack { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::EndOfTrack: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "end_of_track".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                            }
+                        PlayerEvent::Loading { track_id, .. } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "loading".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                        }
+                        PlayerEvent::Preloading { track_id, .. } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "preloading".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                        }
+                        PlayerEvent::TimeToPreloadNextTrack { track_id, .. } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "preload_next".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                        }
+                        PlayerEvent::EndOfTrack { track_id, .. } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "end_of_track".to_string());
+                            env_vars.insert("TRACK_ID", id);
                         },
-                        PlayerEvent::Unavailable { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Unavailable: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "unavailable".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                            }
+                        PlayerEvent::Unavailable { track_id, .. } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "unavailable".to_string());
+                            env_vars.insert("TRACK_ID", id);
                         },
                         PlayerEvent::VolumeChanged { volume } => {
                             env_vars.insert("PLAYER_EVENT", "volume_changed".to_string());
@@ -172,27 +142,21 @@ impl EventHandler {
                             track_id,
                             position_ms,
                             ..
-                        } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Seeked: Invalid track id: {}", e),
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "seeked".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                                env_vars.insert("POSITION_MS", position_ms.to_string());
-                            }
+                        } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "seeked".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                            env_vars.insert("POSITION_MS", position_ms.to_string());
                         },
                         PlayerEvent::PositionCorrection {
                             track_id,
                             position_ms,
                             ..
-                        } => match track_id.to_base62() {
-                            Err(e) => {
-                                warn!("PlayerEvent::PositionCorrection: Invalid track id: {}", e)
-                            }
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "position_correction".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                                env_vars.insert("POSITION_MS", position_ms.to_string());
-                            }
+                        } => {
+                            let id = track_id.id().into_base62();
+                            env_vars.insert("PLAYER_EVENT", "position_correction".to_string());
+                            env_vars.insert("TRACK_ID", id);
+                            env_vars.insert("POSITION_MS", position_ms.to_string());
                         },
                         PlayerEvent::SessionConnected {
                             connection_id,

@@ -5,7 +5,7 @@ use bytes::Bytes;
 use thiserror::Error;
 use tokio::sync::oneshot;
 
-use crate::{packet::PacketType, util::SeqGenerator, Error, FileId, SpotifyId};
+use crate::{packet::PacketType, util::SeqGenerator, Error, FileId, SpotifyItem};
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKey(pub [u8; 16]);
@@ -79,7 +79,7 @@ impl AudioKeyManager {
         Ok(())
     }
 
-    pub async fn request(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, Error> {
+    pub async fn request(&self, track: SpotifyItem, file: FileId) -> Result<AudioKey, Error> {
         let (tx, rx) = oneshot::channel();
 
         let seq = self.lock(move |inner| {
@@ -92,10 +92,10 @@ impl AudioKeyManager {
         rx.await?
     }
 
-    fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) -> Result<(), Error> {
+    fn send_key_request(&self, seq: u32, track: SpotifyItem, file: FileId) -> Result<(), Error> {
         let mut data: Vec<u8> = Vec::new();
         data.write_all(&file.0)?;
-        data.write_all(&track.into_buf())?;
+        data.write_all(&track.id().into_buf())?;
         data.write_u32::<BigEndian>(seq)?;
         data.write_u16::<BigEndian>(0x0000)?;
 

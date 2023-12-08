@@ -9,6 +9,7 @@ use std::{
 
 use futures_util::{stream::FusedStream, FutureExt, StreamExt};
 
+use librespot_core::SpotifyItem;
 use protobuf::{self, Message};
 use rand::prelude::SliceRandom;
 use thiserror::Error;
@@ -20,7 +21,7 @@ use crate::{
     context::PageContext,
     core::{
         authentication::Credentials, mercury::MercurySender, session::UserAttributes,
-        util::SeqGenerator, version, Error, Session, SpotifyId,
+        util::SeqGenerator, version, Error, Session,
     },
     playback::{
         mixer::Mixer,
@@ -524,7 +525,7 @@ impl SpircTask {
                     } else {
                         // only send previous tracks that were before the current playback position
                         let current_position = self.state.playing_track_index() as usize;
-                        let previous_tracks = self.state.track[..current_position].iter().filter_map(|t| SpotifyId::try_from(t).ok()).collect();
+                        let previous_tracks = self.state.track[..current_position].iter().filter_map(|t| SpotifyItem::try_from(t).ok()).collect();
 
                         let scope = if self.autoplay_context {
                             "stations" // this returns a `StationContext` but we deserialize it into a `PageContext`
@@ -1166,7 +1167,7 @@ impl SpircTask {
         }
     }
 
-    fn preview_next_track(&mut self) -> Option<SpotifyId> {
+    fn preview_next_track(&mut self) -> Option<SpotifyItem> {
         self.get_track_id_to_play_from_playlist(self.state.playing_track_index() + 1)
             .map(|(track_id, _)| track_id)
     }
@@ -1195,8 +1196,8 @@ impl SpircTask {
     }
 
     // Mark unavailable tracks so we can skip them later
-    fn handle_unavailable(&mut self, track_id: SpotifyId) {
-        let unavailables = self.get_track_index_for_spotify_id(&track_id, 0);
+    fn handle_unavailable(&mut self, track_id: SpotifyItem) {
+        let unavailables = self.get_track_index_for_spotify_id(track_id, 0);
         for &index in unavailables.iter() {
             let mut unplayable_track_ref = TrackRef::new();
             unplayable_track_ref.set_gid(self.state.track[index].gid().to_vec());
@@ -1393,13 +1394,13 @@ impl SpircTask {
     // Helper to find corresponding index(s) for track_id
     fn get_track_index_for_spotify_id(
         &self,
-        track_id: &SpotifyId,
+        track_id: SpotifyItem,
         start_index: usize,
     ) -> Vec<usize> {
         let index: Vec<usize> = self.state.track[start_index..]
             .iter()
             .enumerate()
-            .filter(|&(_, track_ref)| track_ref.gid() == track_id.to_raw())
+            .filter(|&(_, track_ref)| SpotifyItem::try_from(track_ref).ok() == Some(track_id))
             .map(|(idx, _)| start_index + idx)
             .collect();
         index
@@ -1410,7 +1411,7 @@ impl SpircTask {
         track_ref.context() == "NonPlayable"
     }
 
-    fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
+    fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyItem, u32)> {
         let tracks_len = self.state.track.len();
 
         // Guard against tracks_len being zero to prevent
@@ -1434,8 +1435,8 @@ impl SpircTask {
         // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
 
         let mut track_ref = self.state.track[new_playlist_index].clone();
-        let mut track_id = SpotifyId::try_from(&track_ref);
-        while self.track_ref_is_unavailable(&track_ref) || track_id.is_err() {
+        let mut track_uri = SpotifyItem::try_from(&track_ref);
+        while self.track_ref_is_unavailable(&track_ref) || track_uri.is_err() {
             warn!(
                 "Skipping track <{:?}> at position [{}] of {}",
                 track_ref, new_playlist_index, tracks_len
@@ -1451,11 +1452,11 @@ impl SpircTask {
                 return None;
             }
             track_ref = self.state.track[new_playlist_index].clone();
-            track_id = SpotifyId::try_from(&track_ref);
+            track_uri = SpotifyItem::try_from(&track_ref);
         }
 
-        match track_id {
-            Ok(track_id) => Some((track_id, new_playlist_index as u32)),
+        match track_uri {
+            Ok(track_uri) => Some((track_uri, new_playlist_index as u32)),
             Err(_) => None,
         }
     }

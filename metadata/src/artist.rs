@@ -17,7 +17,7 @@ use crate::{
     Metadata,
 };
 
-use librespot_core::{Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyId, SpotifyItem};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::artist_with_role::ArtistRole;
@@ -173,11 +173,14 @@ impl Artist {
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
-    async fn request(session: &Session, artist_id: &SpotifyId) -> RequestResult {
-        session.spclient().get_artist_metadata(artist_id).await
+    async fn request(session: &Session, artist_id: SpotifyId) -> RequestResult {
+        session
+            .spclient()
+            .get_metadata(&SpotifyItem::artist(artist_id))
+            .await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _id: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

@@ -14,7 +14,7 @@ use crate::{
 use super::file::AudioFiles;
 
 use librespot_core::{
-    date::Date, session::UserData, spotify_id::SpotifyItemType, Error, Session, SpotifyId,
+    date::Date, session::UserData, spotify_id::SpotifyItemType, Error, Session, SpotifyItem,
 };
 
 pub type AudioItemResult = Result<AudioItem, Error>;
@@ -29,8 +29,7 @@ pub struct CoverImage {
 
 #[derive(Debug, Clone)]
 pub struct AudioItem {
-    pub track_id: SpotifyId,
-    pub uri: String,
+    pub item: SpotifyItem,
     pub files: AudioFiles,
     pub name: String,
     pub covers: Vec<CoverImage>,
@@ -60,14 +59,14 @@ pub enum UniqueFields {
 }
 
 impl AudioItem {
-    pub async fn get_file(session: &Session, id: SpotifyId) -> AudioItemResult {
+    pub async fn get_file(session: &Session, item: SpotifyItem) -> AudioItemResult {
         let image_url = session
             .get_user_attribute("image-url")
             .unwrap_or_else(|| String::from("https://i.scdn.co/image/{file_id}"));
 
-        match id.item_type {
+        match item.item_type() {
             SpotifyItemType::Track => {
-                let track = Track::get(session, &id).await?;
+                let track = Track::get(session, item.id()).await?;
 
                 if track.duration <= 0 {
                     return Err(Error::unavailable(MetadataError::InvalidDuration(
@@ -79,8 +78,7 @@ impl AudioItem {
                     return Err(Error::unavailable(MetadataError::ExplicitContentFiltered));
                 }
 
-                let track_id = track.id;
-                let uri = track_id.to_uri()?;
+                let item = SpotifyItem::track(track.id);
                 let album = track.album.name;
 
                 let album_artists = track
@@ -123,8 +121,7 @@ impl AudioItem {
                 };
 
                 Ok(Self {
-                    track_id,
-                    uri,
+                    item,
                     files: track.files,
                     name: track.name,
                     covers,
@@ -137,7 +134,7 @@ impl AudioItem {
                 })
             }
             SpotifyItemType::Episode => {
-                let episode = Episode::get(session, &id).await?;
+                let episode = Episode::get(session, item.id()).await?;
 
                 if episode.duration <= 0 {
                     return Err(Error::unavailable(MetadataError::InvalidDuration(
@@ -149,8 +146,7 @@ impl AudioItem {
                     return Err(Error::unavailable(MetadataError::ExplicitContentFiltered));
                 }
 
-                let track_id = episode.id;
-                let uri = track_id.to_uri()?;
+                let item = SpotifyItem::episode(episode.id);
 
                 let covers = get_covers(episode.covers, image_url);
 
@@ -167,8 +163,7 @@ impl AudioItem {
                 };
 
                 Ok(Self {
-                    track_id,
-                    uri,
+                    item,
                     files: episode.audio,
                     name: episode.name,
                     covers,

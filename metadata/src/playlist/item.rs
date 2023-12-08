@@ -11,7 +11,7 @@ use super::{
     permission::Capabilities,
 };
 
-use librespot_core::{date::Date, SpotifyId};
+use librespot_core::{date::Date, SpotifyId, SpotifyUri};
 
 use librespot_protocol as protocol;
 use protocol::playlist4_external::Item as PlaylistItemMessage;
@@ -20,7 +20,7 @@ use protocol::playlist4_external::MetaItem as PlaylistMetaItemMessage;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistItem {
-    pub id: SpotifyId,
+    pub uri: SpotifyUri,
     pub attributes: PlaylistItemAttributes,
 }
 
@@ -57,7 +57,7 @@ impl TryFrom<&PlaylistItemMessage> for PlaylistItem {
     type Error = librespot_core::Error;
     fn try_from(item: &PlaylistItemMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            id: item.try_into()?,
+            uri: item.try_into()?,
             attributes: item.attributes.get_or_default().try_into()?,
         })
     }

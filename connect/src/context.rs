@@ -111,7 +111,7 @@ where
                             &"a Base-62 encoded Spotify ID",
                         )
                     })?
-                    .to_raw()
+                    .into_buf()
                     .to_vec(),
             );
             t.set_uri(v.uri.to_owned());

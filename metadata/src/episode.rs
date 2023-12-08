@@ -16,7 +16,7 @@ use crate::{
     Metadata,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{date::Date, Error, Session, SpotifyId, SpotifyItem};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::episode::EpisodeType;
@@ -58,11 +58,14 @@ impl_deref_wrapped!(Episodes, Vec<SpotifyId>);
 impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
-    async fn request(session: &Session, episode_id: &SpotifyId) -> RequestResult {
-        session.spclient().get_episode_metadata(episode_id).await
+    async fn request(session: &Session, episode_id: SpotifyId) -> RequestResult {
+        session
+            .spclient()
+            .get_metadata(&SpotifyItem::episode(episode_id))
+            .await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _id: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

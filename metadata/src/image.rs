@@ -6,7 +6,7 @@ use std::{
 
 use crate::util::{impl_deref_wrapped, impl_from_repeated, impl_try_from_repeated};
 
-use librespot_core::{FileId, SpotifyId};
+use librespot_core::{FileId, SpotifyUri};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::image::Size as ImageSize;
@@ -48,7 +48,7 @@ impl_deref_wrapped!(PictureSizes, Vec<PictureSize>);
 #[derive(Debug, Clone)]
 pub struct TranscodedPicture {
     pub target_name: String,
-    pub uri: SpotifyId,
+    pub uri: SpotifyUri,
 }
 
 #[derive(Debug, Clone)]

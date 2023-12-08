@@ -148,14 +148,138 @@ impl fmt::Display for SpotifyId {
     }
 }
 
+impl TryFrom<&[u8]> for SpotifyId {
+    type Error = SpotifyIdError;
+    fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
+        Self::from_buf(src)
+    }
+}
+
+impl TryFrom<&str> for SpotifyId {
+    type Error = SpotifyIdError;
+    fn try_from(src: &str) -> Result<Self, Self::Error> {
+        Self::from_base62(src)
+    }
+}
+
+impl TryFrom<&Vec<u8>> for SpotifyId {
+    type Error = SpotifyIdError;
+    fn try_from(src: &Vec<u8>) -> Result<Self, Self::Error> {
+        Self::try_from(src.as_slice())
+    }
+}
+
+impl TryFrom<&protocol::metadata::Album> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(album: &protocol::metadata::Album) -> Result<Self, Self::Error> {
+        Ok(SpotifyId::from_buf(album.gid())?)
+    }
+}
+
+impl TryFrom<&protocol::metadata::Artist> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(artist: &protocol::metadata::Artist) -> Result<Self, Self::Error> {
+        Ok(SpotifyId::from_buf(artist.gid())?)
+    }
+}
+
+impl TryFrom<&protocol::metadata::Episode> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(episode: &protocol::metadata::Episode) -> Result<Self, Self::Error> {
+        Ok(SpotifyId::from_buf(episode.gid())?)
+    }
+}
+
+impl TryFrom<&protocol::metadata::Track> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(track: &protocol::metadata::Track) -> Result<Self, Self::Error> {
+        Ok(SpotifyId::from_buf(track.gid())?)
+    }
+}
+
+impl TryFrom<&protocol::metadata::Show> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(show: &protocol::metadata::Show) -> Result<Self, Self::Error> {
+        Ok(SpotifyId::from_buf(show.gid())?)
+    }
+}
+
+impl TryFrom<&protocol::metadata::ArtistWithRole> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(artist: &protocol::metadata::ArtistWithRole) -> Result<Self, Self::Error> {
+        Ok(SpotifyId::from_buf(artist.artist_gid())?)
+    }
+}
+
+// Note that this is the unique revision of an item's metadata on a playlist,
+// not the ID of that item or playlist.
+impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(item: &protocol::playlist4_external::MetaItem) -> Result<Self, Self::Error> {
+        Ok(Self::try_from(item.revision())?)
+    }
+}
+
+// Note that this is the unique revision of a playlist, not the ID of that playlist.
+impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(
+        playlist: &protocol::playlist4_external::SelectedListContent,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::try_from(playlist.revision())?)
+    }
+}
+
 /// A basic spotify item with type and identifier
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpotifyItem {
     item_type: SpotifyItemType,
     id: SpotifyId,
 }
 
 impl SpotifyItem {
+    pub fn track(id: SpotifyId) -> Self {
+        Self {
+            item_type: SpotifyItemType::Track,
+            id,
+        }
+    }
+
+    pub fn album(id: SpotifyId) -> Self {
+        Self {
+            item_type: SpotifyItemType::Album,
+            id,
+        }
+    }
+
+    pub fn artist(id: SpotifyId) -> Self {
+        Self {
+            item_type: SpotifyItemType::Artist,
+            id,
+        }
+    }
+
+    pub fn episode(id: SpotifyId) -> Self {
+        Self {
+            item_type: SpotifyItemType::Episode,
+            id,
+        }
+    }
+
+    pub fn playlist(id: SpotifyId) -> Self {
+        Self {
+            item_type: SpotifyItemType::Playlist,
+            id,
+        }
+    }
+
+    pub fn show(id: SpotifyId) -> Self {
+        Self {
+            item_type: SpotifyItemType::Show,
+            id,
+        }
+    }
+
     /// If we understand how to play this item as an individual unit.
     pub fn is_playable(&self) -> bool {
         match self.item_type {
@@ -176,13 +300,13 @@ impl SpotifyItem {
     }
 }
 
-impl From<&SpotifyItem> for String {
-    fn from(value: &SpotifyItem) -> Self {
+impl From<SpotifyItem> for String {
+    fn from(value: SpotifyItem) -> Self {
         format!("{value}")
     }
 }
 
-impl fmt::Display for &SpotifyItem {
+impl fmt::Display for SpotifyItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("spotify:")?;
         f.write_str((&self.item_type).into())?;
@@ -397,45 +521,27 @@ impl TryFrom<&str> for SpotifyUri {
 
 impl SpotifyUri {
     pub fn track(id: SpotifyId) -> Self {
-        Self::Item(SpotifyItem {
-            item_type: SpotifyItemType::Track,
-            id,
-        })
+        Self::Item(SpotifyItem::track(id))
     }
 
     pub fn album(id: SpotifyId) -> Self {
-        Self::Item(SpotifyItem {
-            item_type: SpotifyItemType::Album,
-            id,
-        })
+        Self::Item(SpotifyItem::album(id))
     }
 
     pub fn artist(id: SpotifyId) -> Self {
-        Self::Item(SpotifyItem {
-            item_type: SpotifyItemType::Artist,
-            id,
-        })
+        Self::Item(SpotifyItem::artist(id))
     }
 
     pub fn episode(id: SpotifyId) -> Self {
-        Self::Item(SpotifyItem {
-            item_type: SpotifyItemType::Episode,
-            id,
-        })
+        Self::Item(SpotifyItem::episode(id))
     }
 
     pub fn playlist(id: SpotifyId) -> Self {
-        Self::Item(SpotifyItem {
-            item_type: SpotifyItemType::Playlist,
-            id,
-        })
+        Self::Item(SpotifyItem::playlist(id))
     }
 
     pub fn show(id: SpotifyId) -> Self {
-        Self::Item(SpotifyItem {
-            item_type: SpotifyItemType::Show,
-            id,
-        })
+        Self::Item(SpotifyItem::show(id))
     }
 
     pub fn item(&self) -> Option<&SpotifyItem> {
@@ -643,76 +749,20 @@ impl From<&SpotifyUri> for String {
     }
 }
 
-impl TryFrom<&[u8]> for SpotifyId {
-    type Error = SpotifyIdError;
-    fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
-        Self::from_buf(src)
-    }
-}
-
-impl TryFrom<&str> for SpotifyId {
-    type Error = SpotifyIdError;
-    fn try_from(src: &str) -> Result<Self, Self::Error> {
-        Self::from_base62(src)
-    }
-}
-
-impl TryFrom<&Vec<u8>> for SpotifyId {
-    type Error = SpotifyIdError;
-    fn try_from(src: &Vec<u8>) -> Result<Self, Self::Error> {
-        Self::try_from(src.as_slice())
-    }
-}
-
-impl TryFrom<&protocol::spirc::TrackRef> for SpotifyUri {
+impl TryFrom<&protocol::spirc::TrackRef> for SpotifyItem {
     type Error = crate::Error;
     fn try_from(track: &protocol::spirc::TrackRef) -> Result<Self, Self::Error> {
+        // this seems suspiciously untyped
         match SpotifyId::from_buf(track.gid()) {
             Ok(id) => Ok(Self::track(id)),
-            Err(_) => Ok(Self::try_from(track.uri())?),
+            Err(_) => match SpotifyUri::try_from(track.uri())? {
+                SpotifyUri::Item(item) | SpotifyUri::UserItem(_, item) => Ok(item),
+                SpotifyUri::Station(_)
+                | SpotifyUri::Meta(_)
+                | SpotifyUri::Local(_)
+                | SpotifyUri::Unknown(_, _) => Err(todo!()),
+            },
         }
-    }
-}
-
-impl TryFrom<&protocol::metadata::Album> for SpotifyUri {
-    type Error = crate::Error;
-    fn try_from(album: &protocol::metadata::Album) -> Result<Self, Self::Error> {
-        Ok(Self::album(SpotifyId::from_buf(album.gid())?))
-    }
-}
-
-impl TryFrom<&protocol::metadata::Artist> for SpotifyUri {
-    type Error = crate::Error;
-    fn try_from(artist: &protocol::metadata::Artist) -> Result<Self, Self::Error> {
-        Ok(Self::artist(SpotifyId::from_buf(artist.gid())?))
-    }
-}
-
-impl TryFrom<&protocol::metadata::Episode> for SpotifyUri {
-    type Error = crate::Error;
-    fn try_from(episode: &protocol::metadata::Episode) -> Result<Self, Self::Error> {
-        Ok(Self::episode(SpotifyId::from_buf(episode.gid())?))
-    }
-}
-
-impl TryFrom<&protocol::metadata::Track> for SpotifyUri {
-    type Error = crate::Error;
-    fn try_from(track: &protocol::metadata::Track) -> Result<Self, Self::Error> {
-        Ok(Self::track(SpotifyId::from_buf(track.gid())?))
-    }
-}
-
-impl TryFrom<&protocol::metadata::Show> for SpotifyUri {
-    type Error = crate::Error;
-    fn try_from(show: &protocol::metadata::Show) -> Result<Self, Self::Error> {
-        Ok(Self::show(SpotifyId::from_buf(show.gid())?))
-    }
-}
-
-impl TryFrom<&protocol::metadata::ArtistWithRole> for SpotifyUri {
-    type Error = crate::Error;
-    fn try_from(artist: &protocol::metadata::ArtistWithRole) -> Result<Self, Self::Error> {
-        Ok(Self::artist(SpotifyId::from_buf(artist.artist_gid())?))
     }
 }
 
@@ -720,25 +770,6 @@ impl TryFrom<&protocol::playlist4_external::Item> for SpotifyUri {
     type Error = crate::Error;
     fn try_from(item: &protocol::playlist4_external::Item) -> Result<Self, Self::Error> {
         Ok(Self::try_from(item.uri())?)
-    }
-}
-
-// Note that this is the unique revision of an item's metadata on a playlist,
-// not the ID of that item or playlist.
-impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyId {
-    type Error = crate::Error;
-    fn try_from(item: &protocol::playlist4_external::MetaItem) -> Result<Self, Self::Error> {
-        Ok(Self::try_from(item.revision())?)
-    }
-}
-
-// Note that this is the unique revision of a playlist, not the ID of that playlist.
-impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyId {
-    type Error = crate::Error;
-    fn try_from(
-        playlist: &protocol::playlist4_external::SelectedListContent,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self::try_from(playlist.revision())?)
     }
 }
 
@@ -1155,7 +1186,10 @@ mod tests {
     fn from_buf_invalid() {
         assert!(SpotifyId::from_buf(&[]).is_err());
         assert!(SpotifyId::from_buf(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]).is_err());
-        assert!(SpotifyId::from_buf(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]).is_err());
+        assert!(
+            SpotifyId::from_buf(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+                .is_err()
+        );
     }
 
     #[test]

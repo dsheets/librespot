@@ -34,10 +34,10 @@ use crate::{
         connect::PutStateRequest,
         extended_metadata::BatchedEntityRequest,
     },
-    spotify_id::SpotifyUri,
+    spotify_id::SpotifyItem,
     token::Token,
     version::spotify_version,
-    Error, FileId, SpotifyId,
+    Error, FileId, SpotifyId, SpotifyUri,
 };
 
 component! {
@@ -543,29 +543,13 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_metadata(&self, scope: &str, id: &SpotifyId) -> SpClientResult {
-        let endpoint = format!("/metadata/4/{}/{}", scope, id.into_base16());
+    pub async fn get_metadata(&self, item: &SpotifyItem) -> SpClientResult {
+        let endpoint = format!(
+            "/metadata/4/{}/{}",
+            item.item_type(),
+            item.id().into_base16()
+        );
         self.request(&Method::GET, &endpoint, None, None).await
-    }
-
-    pub async fn get_track_metadata(&self, track_id: &SpotifyId) -> SpClientResult {
-        self.get_metadata("track", track_id).await
-    }
-
-    pub async fn get_episode_metadata(&self, episode_id: &SpotifyId) -> SpClientResult {
-        self.get_metadata("episode", episode_id).await
-    }
-
-    pub async fn get_album_metadata(&self, album_id: &SpotifyId) -> SpClientResult {
-        self.get_metadata("album", album_id).await
-    }
-
-    pub async fn get_artist_metadata(&self, artist_id: &SpotifyId) -> SpClientResult {
-        self.get_metadata("artist", artist_id).await
-    }
-
-    pub async fn get_show_metadata(&self, show_id: &SpotifyId) -> SpClientResult {
-        self.get_metadata("show", show_id).await
     }
 
     pub async fn get_lyrics(&self, track_id: &SpotifyId) -> SpClientResult {
@@ -590,7 +574,7 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_playlist(&self, playlist_id: &SpotifyId) -> SpClientResult {
+    pub async fn get_playlist(&self, playlist_id: SpotifyId) -> SpClientResult {
         let endpoint = format!("/playlist/v2/playlist/{}", playlist_id.into_base62());
 
         self.request(&Method::GET, &endpoint, None, None).await
@@ -659,7 +643,7 @@ impl SpClient {
         scope: &str,
         context_uri: &str,
         count: Option<usize>,
-        previous_tracks: Vec<SpotifyId>,
+        previous_tracks: Vec<SpotifyItem>,
         autoplay: bool,
     ) -> SpClientResult {
         let mut endpoint = format!("/radio-apollo/v3/{scope}/{context_uri}?autoplay={autoplay}");
@@ -671,7 +655,7 @@ impl SpClient {
 
         let previous_track_str = previous_tracks
             .iter()
-            .map(|track| track.into_base62())
+            .map(|track| track.id().into_base62())
             .collect::<Vec<_>>()
             .join(",");
         // better than checking `previous_tracks.len() > 0` because the `filter_map` could still return 0 items

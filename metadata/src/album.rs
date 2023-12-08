@@ -18,7 +18,7 @@ use crate::{
     Metadata,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{date::Date, Error, Session, SpotifyId, SpotifyItem};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::album::Type as AlbumType;
@@ -76,11 +76,14 @@ impl Album {
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
-    async fn request(session: &Session, album_id: &SpotifyId) -> RequestResult {
-        session.spclient().get_album_metadata(album_id).await
+    async fn request(session: &Session, album_id: SpotifyId) -> RequestResult {
+        session
+            .spclient()
+            .get_metadata(&SpotifyItem::album(album_id))
+            .await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _id: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

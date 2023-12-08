@@ -19,6 +19,7 @@ use futures_util::{
     future, future::FusedFuture, stream::futures_unordered::FuturesUnordered, StreamExt,
     TryFutureExt,
 };
+use librespot_core::SpotifyItem;
 use parking_lot::Mutex;
 use symphonia::core::io::MediaSource;
 use tokio::sync::{mpsc, oneshot};
@@ -31,7 +32,7 @@ use crate::{
     audio_backend::Sink,
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
-    core::{util::SeqGenerator, Error, Session, SpotifyId},
+    core::{util::SeqGenerator, Error, Session},
     decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::VolumeGetter,
@@ -94,12 +95,12 @@ static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 enum PlayerCommand {
     Load {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         play: bool,
         position_ms: u32,
     },
     Preload {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
     },
     Play,
     Pause,
@@ -139,17 +140,17 @@ pub enum PlayerEvent {
     // Fired when the player is stopped (e.g. by issuing a "stop" command to the player).
     Stopped {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
     },
     // The player is delayed by loading a track.
     Loading {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         position_ms: u32,
     },
     // The player is preloading a track.
     Preloading {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
     },
     // The player is playing a track.
     // This event is issued at the start of playback of whenever the position must be communicated
@@ -160,31 +161,31 @@ pub enum PlayerEvent {
     // after a buffer-underrun
     Playing {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         position_ms: u32,
     },
     // The player entered a paused state.
     Paused {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         position_ms: u32,
     },
     // The player thinks it's a good idea to issue a preload command for the next track now.
     // This event is intended for use within spirc.
     TimeToPreloadNextTrack {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
     },
     // The player reached the end of a track.
     // This event is intended for use within spirc. Spirc will respond by issuing another command.
     EndOfTrack {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
     },
     // The player was unable to load the requested track.
     Unavailable {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
     },
     // The mixer volume was set to a new level.
     VolumeChanged {
@@ -192,12 +193,12 @@ pub enum PlayerEvent {
     },
     PositionCorrection {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         position_ms: u32,
     },
     Seeked {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         position_ms: u32,
     },
     TrackChanged {
@@ -511,7 +512,7 @@ impl Player {
         }
     }
 
-    pub fn load(&self, track_id: SpotifyId, start_playing: bool, position_ms: u32) {
+    pub fn load(&self, track_id: SpotifyItem, start_playing: bool, position_ms: u32) {
         self.command(PlayerCommand::Load {
             track_id,
             play: start_playing,
@@ -519,7 +520,7 @@ impl Player {
         });
     }
 
-    pub fn preload(&self, track_id: SpotifyId) {
+    pub fn preload(&self, track_id: SpotifyItem) {
         self.command(PlayerCommand::Preload { track_id });
     }
 
@@ -645,11 +646,11 @@ struct PlayerLoadedTrackData {
 enum PlayerPreload {
     None,
     Loading {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
     },
     Ready {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         loaded_track: Box<PlayerLoadedTrackData>,
     },
 }
@@ -659,13 +660,13 @@ type Decoder = Box<dyn AudioDecoder + Send>;
 enum PlayerState {
     Stopped,
     Loading {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         play_request_id: u64,
         start_playback: bool,
         loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
     },
     Paused {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         play_request_id: u64,
         decoder: Decoder,
         audio_item: AudioItem,
@@ -679,7 +680,7 @@ enum PlayerState {
         is_explicit: bool,
     },
     Playing {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         play_request_id: u64,
         decoder: Decoder,
         normalisation_data: NormalisationData,
@@ -694,7 +695,7 @@ enum PlayerState {
         is_explicit: bool,
     },
     EndOfTrack {
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         play_request_id: u64,
         loaded_track: PlayerLoadedTrackData,
     },
@@ -890,7 +891,10 @@ impl PlayerTrackLoader {
         } else if let Some(alternatives) = &audio_item.alternatives {
             let alternatives: FuturesUnordered<_> = alternatives
                 .iter()
-                .map(|alt_id| AudioItem::get_file(&self.session, *alt_id))
+                .map(|alt_id| {
+                    let item = SpotifyItem::track(*alt_id);
+                    AudioItem::get_file(&self.session, item)
+                })
                 .collect();
 
             alternatives
@@ -923,17 +927,14 @@ impl PlayerTrackLoader {
 
     async fn load_track(
         &self,
-        spotify_id: SpotifyId,
+        spotify_id: SpotifyItem,
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
         let audio_item = match AudioItem::get_file(&self.session, spotify_id).await {
             Ok(audio) => match self.find_available_alternative(audio).await {
                 Some(audio) => audio,
                 None => {
-                    warn!(
-                        "<{}> is not available",
-                        spotify_id.to_uri().unwrap_or_default()
-                    );
+                    warn!("<{}> is not available", spotify_id);
                     return None;
                 }
             },
@@ -945,7 +946,7 @@ impl PlayerTrackLoader {
 
         info!(
             "Loading <{}> with Spotify URI <{}>",
-            audio_item.name, audio_item.uri
+            audio_item.name, audio_item.item
         );
 
         // (Most) podcasts seem to support only 96 kbps Ogg Vorbis, so fall back to it
@@ -1686,7 +1687,7 @@ impl PlayerInternal {
 
     fn start_playback(
         &mut self,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         play_request_id: u64,
         loaded_track: PlayerLoadedTrackData,
         start_playback: bool,
@@ -1760,7 +1761,7 @@ impl PlayerInternal {
 
     fn handle_command_load(
         &mut self,
-        track_id: SpotifyId,
+        track_id: SpotifyItem,
         play_request_id_option: Option<u64>,
         play: bool,
         position_ms: u32,
@@ -1953,7 +1954,7 @@ impl PlayerInternal {
         Ok(())
     }
 
-    fn handle_command_preload(&mut self, track_id: SpotifyId) {
+    fn handle_command_preload(&mut self, track_id: SpotifyItem) {
         debug!("Preloading track");
         let mut preload_track = true;
         // check whether the track is already loaded somewhere or being loaded.
@@ -2182,7 +2183,7 @@ impl PlayerInternal {
 
     fn load_track(
         &mut self,
-        spotify_id: SpotifyId,
+        spotify_id: SpotifyItem,
         position_ms: u32,
     ) -> impl FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send + 'static {
         // This method creates a future that returns the loaded stream and associated info.

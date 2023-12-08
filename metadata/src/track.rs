@@ -18,7 +18,7 @@ use crate::{
     Album, Metadata, RequestResult,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{date::Date, Error, Session, SpotifyId, SpotifyItem};
 use librespot_protocol as protocol;
 
 #[derive(Debug, Clone)]
@@ -59,11 +59,14 @@ impl_deref_wrapped!(Tracks, Vec<SpotifyId>);
 impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
-    async fn request(session: &Session, track_id: &SpotifyId) -> RequestResult {
-        session.spclient().get_track_metadata(track_id).await
+    async fn request(session: &Session, track_id: SpotifyId) -> RequestResult {
+        session
+            .spclient()
+            .get_metadata(&SpotifyItem::track(track_id))
+            .await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _id: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

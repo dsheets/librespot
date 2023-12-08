@@ -39,4 +39,4 @@ pub use config::SessionConfig;
 pub use error::Error;
 pub use file_id::FileId;
 pub use session::Session;
-pub use spotify_id::SpotifyId;
+pub use spotify_id::{SpotifyId, SpotifyItem, SpotifyUri};

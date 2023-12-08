@@ -8,7 +8,7 @@ use crate::{
     restriction::Restrictions, Metadata, RequestResult,
 };
 
-use librespot_core::{Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyId, SpotifyItem, SpotifyUri};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::show::ConsumptionOrder as ShowConsumptionOrder;
@@ -30,7 +30,7 @@ pub struct Show {
     pub media_type: ShowMediaType,
     pub consumption_order: ShowConsumptionOrder,
     pub availability: Availabilities,
-    pub trailer_uri: SpotifyId,
+    pub trailer_uri: SpotifyUri,
     pub has_music_and_talk: bool,
     pub is_audiobook: bool,
 }
@@ -39,11 +39,14 @@ pub struct Show {
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
-    async fn request(session: &Session, show_id: &SpotifyId) -> RequestResult {
-        session.spclient().get_show_metadata(show_id).await
+    async fn request(session: &Session, show_id: SpotifyId) -> RequestResult {
+        session
+            .spclient()
+            .get_metadata(&SpotifyItem::show(show_id))
+            .await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _id: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }
@@ -66,7 +69,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Show {
             media_type: show.media_type(),
             consumption_order: show.consumption_order(),
             availability: show.availability.as_slice().try_into()?,
-            trailer_uri: SpotifyId::from_uri(show.trailer_uri())?,
+            trailer_uri: SpotifyUri::try_from(show.trailer_uri())?,
             has_music_and_talk: show.music_and_talk(),
             is_audiobook: show.is_audiobook(),
         })
