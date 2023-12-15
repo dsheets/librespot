@@ -130,7 +130,8 @@ impl SpotifyId {
     ///
     /// [canonically]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn into_base62(&self) -> String {
-        base62::encode_alternative(self.0)
+        let b62_number = base62::encode_alternative(self.0);
+        format!("{b62_number:0>22}")
     }
 }
 
@@ -888,6 +889,13 @@ mod tests {
 
             assert_eq!(item.id.into_base62(), c.base62);
         }
+    }
+
+    #[test]
+    fn into_base62_zero() {
+        let zeros = "0000000000000000000000";
+        let zero = SpotifyId::from_base62(zeros).unwrap();
+        assert_eq!(zero.into_base62(), zeros)
     }
 
     #[test]
